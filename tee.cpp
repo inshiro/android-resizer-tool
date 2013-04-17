@@ -5,6 +5,7 @@
 //#include <fcntl.h>
 #define MAXFILE 300
 using namespace std;
+
 void tee(int numfiles, char* logfile[]) {
 //http://david.tribble.com/src/tee.c
     char invbuf[10*1024]; // Stdin buffer
