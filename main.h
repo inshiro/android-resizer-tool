@@ -1,15 +1,13 @@
 string sd;
 string od;
-string var;
 string sdpi;
 string odpi;
 string logop("Enabled");
 string command;
-string ver = "2.5";
-string ftitle = "Android Resizer Tool v" + ver;
+string ver = "2.6";
+string title = "Android Resizer Tool v" + ver;
+bool called=0;
 void menu();
-
-
 
 void clear() {
 	#if _WIN32 || _WIN64
@@ -100,14 +98,14 @@ int kbhit(void) {
 }
 #endif
 
-void title() {
+void ftitle() {
 	#if _WIN32 || _WIN64
-	wstring stemp = s2ws(ftitle);
+	wstring stemp = s2ws(title);
 	LPCWSTR result = stemp.c_str();
 	SetConsoleTitle(result);
 	#else
-	//printf("%c]0;%s%c", '\033', ftitle, '\007');
-	cout << "\033]0;" + ftitle + "\007";
+	//printf("%c]0;%s%c", '\033', title, '\007');
+	cout << "\033]0;" + title + "\007";
 	#endif
 }
 
@@ -120,7 +118,6 @@ while (!kbhit());
 #endif
 }
 
-/*
 void cleanpath(string &f) {
 	trim(f);
 	if(find_first(f, "\"")) erase_all(f, "\"");
@@ -135,7 +132,6 @@ void cleanpath(string &f) {
 	c = '\0';
 	}
 }
-*/
 
 void read(string str, const char* delim){
 	vector<string> list;
@@ -151,7 +147,7 @@ void read(string str, const char* delim){
 		list.push_back(writable);
 		writable = strtok (NULL, delim);
 	}
-	delete[] writable; //Deletes char*
+	delete[] writable;
 
 	//Analyze list vector & sets values
 	if(list[0] == "convert_command") command = list[1];
@@ -159,8 +155,24 @@ void read(string str, const char* delim){
 	else if(list[0] == "convert_destination") odpi = list[1];
 	else if(list[0] == "convert_source_path") sd = list[1];
 	else if(list[0] == "convert_destination_path") od = list[1];
-	//else { cerr << "\n An error occurred while reading settings "; fp(); }
 	list.clear();
+}
+
+bool find(string s, const char* c) {
+unsigned *found = new unsigned;
+*found = s.find(c);
+if(*found != string::npos) return 1;
+delete found;
+return 0;
+}
+
+bool dpicheck(string s) {
+if(!find(s, "xhdpi"))
+	if(!find(s, "hdpi"))
+		if(!find(s, "mdpi"))
+			if(!find(s, "ldpi"))
+				return 1;
+return 0;
 }
 
 void settings() {
@@ -173,18 +185,19 @@ else if(exists("settings.ini"))
 	cout << "\n -----------------------------------"
 	     << "\n\n Source DPI: ";
 	getline(cin, sdpi);
+	if(dpicheck(sdpi)) settings();
 	cout << "\n Output DPI: ";
 	getline(cin, odpi);
+	if(dpicheck(odpi)) settings();
 	cout << "\n Source Folder: ";
 	getline(cin, sd);
 	cout << "\n Output Folder: ";
 	getline(cin, od);
 	
-	string convert = cd + "\\other\\convert.exe";
 	#if _WIN32 || _WIN64
-	command = convert + " -resize %3$s -unsharp 0x1 %1$s %2$s";
+	command = "other\\convert.exe -resize %3$s %1$s %2$s";
 	#else
-	command = "convert -resize %3$s -unsharp 0x1 %1$s %2$s";
+	command = "convert -resize %3$s %1$s %2$s";
 	#endif
 	if(sdpi.empty()) sdpi = "xhdpi";
 	if(odpi.empty()) odpi = "mdpi,ldpi,hdpi";
@@ -194,6 +207,14 @@ else if(exists("settings.ini"))
 	zfile.open("settings.ini");
 	zfile << "convert_command=" << command << "\n"; //Overwrites first file
 	zfile.close();
+	
+	cleanpath(sd);
+	string shorten = path(sd).stem().stem().string();
+	if(is_directory(shorten)) sd = shorten;
+	cleanpath(od);
+	shorten = system_complete(path(od)).parent_path().string();
+	if(shorten == cd) od = path(od).stem().stem().string();
+	shorten.clear();
 	
 	ofstream ofile;
 	ofile.open("settings.ini", ofstream::app); //Appends to file
@@ -207,6 +228,8 @@ else if(exists("settings.ini"))
 	ofile << "mdpi=1\n";
 	ofile << "ldpi=0.75\n";
 	ofile.close();
+	if(called) exit(EXIT_SUCCESS);
+	if(!called) menu();
 }
 
 void checksettings() {
@@ -215,8 +238,8 @@ void checksettings() {
 		ifstream infile;
 		infile.open("settings.ini");
 		for(int i=1; i < 6; i++) {
-		infile.getline(str, 256);
-		read(str, "=");
+			infile.getline(str, 256);
+			read(str, "=");
 		}
 		delete[] str;
 		infile.close();
@@ -238,23 +261,25 @@ void log_color() {
 }
 
 string getdate() {
-//Get Current Date
 date current_date(day_clock::local_day());
       date::ymd_type ymd = current_date.year_month_day();
       greg_weekday wd = current_date.day_of_week();
-//Get Current Time
-string suffix;
+// Get Current Time
+string suffix = "PM";
+int *hour = new int;
 time_t now = time(0);
 struct tm *current = localtime(&now);
-if(current->tm_hour > 11) suffix = "PM";
-else if(current->tm_hour < 12) suffix = "AM";
+*hour = current->tm_hour-12;
+if (*hour < 0) { suffix = "AM"; *hour += 12; }
+if (*hour == 0) *hour = 12;
 ostringstream oss;
 oss		<< wd.as_long_string() << " "
 		<< ymd.month.as_long_string() << " "
 		<< ymd.day << " " << ymd.year << "  "
-		<< current->tm_hour-12 << ":" << current->tm_min << ":" << current->tm_sec
+		<< *hour << ":" << current->tm_min << ":" << current->tm_sec
 		<< " " << suffix;
 string l = oss.str();
+delete hour;
 return l;
 }
 
@@ -262,34 +287,67 @@ void checks() {
 	if(!exists("settings.ini")) menu();
 	#if _WIN32 || _WIN64
 	if(!exists(cd + "\\other\\convert.exe")) {
-	cerr << "\n Error: ";
-	SetConsoleTextAttribute(hConsole, 0 | 7*16);
-	cerr << "other\\convert.exe";
-	SetConsoleTextAttribute(hConsole, saved_colors);
-	cerr << " not found. ";
-	fp();
-	menu();
+		cerr << "\n Error: ";
+		SetConsoleTextAttribute(hConsole, 0 | 7*16);
+		cerr << "other\\convert.exe";
+		SetConsoleTextAttribute(hConsole, saved_colors);
+		cerr << " not found. ";
+		fp();
+		menu();
 	}
 	if(!exists(cd + "\\other\\tee.exe")) {
-	cerr << "\n Error: ";
-	SetConsoleTextAttribute(hConsole, 0 | 7*16);
-	cerr << "other\\tee.exe";
-	SetConsoleTextAttribute(hConsole, saved_colors);
-	cerr << " not found. ";
-	fp();
-	menu();
+		cerr << "\n Error: ";
+		SetConsoleTextAttribute(hConsole, 0 | 7*16);
+		cerr << "other\\tee.exe";
+		SetConsoleTextAttribute(hConsole, saved_colors);
+		cerr << " not found. ";
+		fp();
+		menu();
+	}
+	if(!exists("C:\\Windows\\System32\\java.exe")) {
+		cerr << "\n Error: ";
+		SetConsoleTextAttribute(hConsole, 0 | 7*16);
+		cerr << "Java";
+		SetConsoleTextAttribute(hConsole, saved_colors);
+		cerr << " not found. ";
+		fp();
+		menu();
 	}
 	#else
 	if(!exists("/usr/bin/convert")) {
-	cerr << "\n ImageMagick not found. ";
-	fp();
-	menu();
+		cerr << "\n Error: ImageMagick not found. ";
+		fp();
+		menu();
+	}
+	if(!exists("/usr/bin/java")) {
+		cerr << "\n Error: Java not found. ";
+		fp();
+		menu();
 	}
 	#endif
+	// Checks if input/output folders has spaces in them
+	unsigned found = sd.find(" ");
+	if (found!=string::npos) {
+		cerr << "\n Error: Your input folder has spaces! ";
+		fp();
+		menu();
+	}
+	found = od.find(" ");
+	if (found!=string::npos) {
+		cerr << "\n Error: Your output folder has spaces! ";
+		fp();
+		menu();
+	}
+	found = cd.find(" ");
+	if (found!=string::npos) {
+		cerr << "\n Error: Current Directory has spaces! Please move this tool somewhere else.";
+		fp();
+		menu();
+	}
 	if(wildcard("*.jar") == "") {
-	cerr << "\n Jar file not found. ";
-	fp();
-	menu();
+		cerr << "\n Error: Jar file not found. ";
+		fp();
+		menu();
 	}
 	if(!is_directory(sd)) create_directory(sd);
 	if(!is_directory(od)) create_directory(od);
@@ -332,26 +390,27 @@ void checks() {
 	fp();
 	menu();
 	}
+	if(called) exit(EXIT_SUCCESS);
 }
 
 void convert() {
+if(called) {
+checksettings();
+logop == "Enabled";
+called=0;
 checks();
+called=1;
+}
+else checks();
 const char* log("art_log.txt");
-clear();
+if(!called) clear();
 cout << '\n';
 if(logop == "Enabled") {
 	ofstream ofile;
 	ofile.open(log, ofstream::app);
-	ofile << "\n\n                    " << getdate();
-	ofile << "\n====================================================================\n";
+	ofile	<< "\n\n                    " << getdate()
+			<< "\n====================================================================\n";
 	ofile.close();
-	filtering_ostream file;
-    file.push(file_sink(log, ios_base::app));
-    // Tee filter instance (will be copied into each filter stream)
-    const tee_filter<ostream> teeFilter(file);
-    filtering_ostream out; // out tee
-    out.push(teeFilter);
-    out.push(cout);
 	#if _WIN32 || _WIN64
 	std::system(("java -jar " + wildcard("*.jar") +
 					" convert_source "  + sdpi +
@@ -368,35 +427,22 @@ if(logop == "Enabled") {
 	ofile.open(log, ofstream::app);
 	ofile << "====================================================================";
 	ofile.close();
-	
-	//Read log & redirect to screen
-	/*ifstream ifile;
-	ifile.open(log);
-	string temp;
-	getline(ifile, temp, '\0');
-	cout << temp;
-	ifile.close();
-	temp.clear();*/
 }
 else if(logop == "Disabled") {
 	std::system(("java -jar " + wildcard("*.jar") +
 						" convert_source "  + sdpi +
 						" convert_destination "  + odpi +
 						" convert_source_path "  + sd +
-						" convert_destination_path " + od
-						).c_str());
+						" convert_destination_path " + od).c_str());
 	}
+	if(called) exit(EXIT_SUCCESS);
 	cout << "\n\nPress any key to continue . . . ";
 	fp();
 }
 
 void menu() {
-	#if _WIN32 || _WIN64
-	title();
-	std::system("MODE CON:COLS=106 LINES=30");
-	#endif
 	string i;
-	if(!var.empty()) var.clear();
+	called=0;
 	while(true) {
 		checksettings();
 		clear();

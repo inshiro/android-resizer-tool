@@ -27,7 +27,6 @@
 using namespace std;
 using namespace boost;
 using namespace boost::gregorian;
-using namespace boost::iostreams;
 using namespace boost::filesystem;
 string cd;
 #include "main.h"
@@ -37,7 +36,8 @@ void usage(string file) {
 			<< "\nResize Android Drawables, including .9.pngs"
 			<< "\n\n   -h, --help       Display this help message"
 			<< "\n   -c, --convert    Resize/convert source folder"
-			<< "\n   -v, --version    Display tool version";
+			<< "\n   -v, --version    Display tool version"
+			<< "\n   setup            Modify settings";
 	#if _WIN32 || _WIN64
 	cout << '\n';
 	#else
@@ -48,30 +48,42 @@ void usage(string file) {
 
 int main(int ac, char* av[]) {
 	cd = system_complete(av[0]).parent_path().string();
-	if(ac == 1) menu();
+	if(ac == 1) {
+		#if _WIN32 || _WIN64
+		ftitle();
+		std::system("MODE CON:COLS=106 LINES=30");
+		#endif
+		menu();
+	}
 	string a = av[1];
 	trim(a);
-	if (a == "-h" || a == "--help")
-		usage((string)system_complete(av[0]).stem().string());
-	else if (a == "-v" || a == "--version") {
-	#if _WIN32 || _WIN64
-	cout << ftitle << '\n';
-	#else
-	cout << ftitle << "\n\n";
-	#endif
+	if (a == "-v" || a == "--version") {
+		#if _WIN32 || _WIN64
+		cout << title << '\n';
+		#else
+		cout << title << "\n\n";
+		#endif
 	}
-	else if (a == "-c" || a == "--convert") convert();
-	else if (a == "setup") settings();
+	else if (a == "-h" || a == "--help")
+		usage((string)system_complete(av[0]).stem().string());
+	else if (a == "-c" || a == "--convert") {
+		called=1;
+		convert();
+	}
+	else if (a == "setup") {
+	called = 1;
+	settings();
+	}
 	else {
-	cerr << "Unknown option: ";
-	for(int i=1; i < ac; i++)
-		 cerr << av[i] << " ";
-	#if _WIN32 || _WIN64
-	cerr << '\n';
-	#else
-	cerr << "\n\n";
-	#endif
-	exit(EXIT_SUCCESS);
+		cerr << "Unknown option: ";
+		for(int i=1; i < ac; i++)
+			 cerr << av[i] << " ";
+		#if _WIN32 || _WIN64
+		cerr << '\n';
+		#else
+		cerr << "\n\n";
+		#endif
+		exit(EXIT_SUCCESS);
 	}
 	return 0;
 }
